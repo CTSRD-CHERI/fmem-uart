@@ -11,9 +11,9 @@ LINKFLAGS =
 
 all: $(OUTPT)
 
-$(OUTPT): $(SRC)
+$(OUTPT): $(SRC) fmem.h
 	mkdir -p $(OBJDIR)
-	$(CC) -L $(OBJDIR) -I $(CURDIR) -o $@ $^ $(CFLAGS) $(LINKFLAGS)
+	$(CC) -L $(OBJDIR) -I $(CURDIR) -o $@ $< $(CFLAGS) $(LINKFLAGS)
 
 .PHONY: clean
 
