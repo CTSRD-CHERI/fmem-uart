@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2021 Ruslan Bukin <br@bsdpad.com>
  * Copyright (c) 2022 Jon Woodruff <Jonathan.Woodruff@cl.cam.ac.uk>
+ * Copyright (c) 2024 Samuel W. Stark <sws35@cam.ac.uk>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -34,6 +35,9 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/ioctl.h>
+
+#include <stdint.h>
+#include <stdio.h>
 
 struct fmem_request {
     uint32_t offset;
