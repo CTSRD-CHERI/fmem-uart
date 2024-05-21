@@ -30,8 +30,92 @@
  * SUCH DAMAGE.
  */
 
+// Basics
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <assert.h>
+
+// Safety/error detection
+#include <errno.h>
+#include <string.h>
+
+// For opening/closing fmem file
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+// For accessing fmem file
 #include "fmem.h"
 
-int main(int argc, char **argv) {
-    return 0;
+// Print the help message for this program and exit
+void print_help(const char* argv0) {
+    fprintf(stderr, 
+            "\nUsage:\t%s { device } { uart-offset }\n"
+            "\tdevice : fmem device to act against\n"
+            "\tuart-offset: the offset of the UART Receiver Buffer Register/Transmitter Holding Register\n"
+            "\t             (parsed with strtoul(base=16), must be in hex)\n"
+            "\t or:\t%s --help to read this help message\n",
+            argv0, argv0);
+    exit(EXIT_FAILURE);
+}
+
+// Print an error that occurred when parsing/using the arguments to this program, then print the help message and exit
+void print_arg_error(const char* context, const char* argv0) {
+    if (errno) {
+        fprintf(stderr, "Error encountered while %s\nerrno %d (%s)\n\n", context, errno, strerror(errno));
+    } else {
+        fprintf(stderr, "Error encountered while %s\n\n", context);
+    }
+    print_help(argv0);
+}
+
+int main(int argc, const char **argv) {
+    // Make sure we have 3 arguments
+    assert(argc >= 1 && "argv must contain path to this program as first arg");
+
+    if (argc < 3) {
+        print_help(argv[0]);
+    }
+
+    if (strcmp("-h", argv[1]) || strcmp("--help", argv[1])) {
+        print_help(argv[0]);
+    }
+
+    // Parse uart-offset
+    errno = 0;
+    char* last_char_of_uart_offset = NULL;
+    uint32_t uart_offset = strtoul(argv[2], &last_char_of_uart_offset, 16);
+    if (errno) {
+        print_arg_error("parsing uart-offset", argv[0]);
+    }
+    // strtoul may also parse nothing if it can't find valid content, at which point errno is not set but 
+    // last_char will be set to the start of the string.
+    if (last_char_of_uart_offset == argv[2]) {
+        print_arg_error("parsing uart-offset", argv[0]);
+    }
+
+    // Open the fmem file
+    errno = 0;
+    int fmem_dev = open(argv[1], O_RDWR);
+    if (fmem_dev < 0) {
+        print_arg_error("opening fmem device", argv[0]);
+    }
+
+    // Read from the UART until the file disappears
+    int error = 0;
+    do {
+        uint8_t ascii = 0;
+        error = fmem_read8(fmem_dev, uart_offset, &ascii);
+        fprintf(stdout, "%c", ascii);
+    } while (error == 0);
+
+    // Don't EXIT_FAILURE if fmem returns an error - that can just mean the file was closed while we're passively using it
+    fprintf(stderr, "fmem-uart stopped because of fmem error %d\n", error);
+
+    // Close the fmem file
+    close(fmem_dev);
+
+    // Done
+    return EXIT_SUCCESS;
 }
