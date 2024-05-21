@@ -39,7 +39,6 @@
 #include <sys/ioctl.h>
 
 #include <stdint.h>
-#include <stdio.h>
 
 struct fmem_request {
     uint32_t offset;
@@ -52,9 +51,7 @@ enum {
     FMEM_WRITE  = _IOWR('X', 2, struct fmem_request),
 };
 
-#define FMEM_HOST_CACHED_MEM_BASE 0xc0000000
-
-uint32_t fmem_read(int fd, uint32_t offset, uint8_t width)
+int fmem_read(int fd, uint32_t offset, uint8_t width, uint32_t* read_out)
 {
     struct fmem_request req;
     int error;
@@ -71,28 +68,53 @@ uint32_t fmem_read(int fd, uint32_t offset, uint8_t width)
         uint32_t dat_mask = -1;
         if (width == 1) dat_mask = 0xFF;
         if (width == 2) dat_mask = 0xFFFF;
-        printf("read! offset: %x, req.data: %x, adr_mask: %x, dat_mask: %x \r\n", offset, req.data, adr_mask, dat_mask);
-        return ((wide >> ((offset & ~adr_mask)*8)) & dat_mask);
-    } else return (0);
+        *read_out = ((wide >> ((offset & ~adr_mask)*8)) & dat_mask);
+    }
+    
+    return error;
 }
-uint8_t fmem_read8(int fd, uint32_t offset)
+int fmem_read8(int fd, uint32_t offset, uint8_t* read_out)
 {
-    return fmem_read(fd, offset, 1);
+    uint32_t data = 0;
+    int error = fmem_read(fd, offset, 1, &data);
+    if (error) {
+        return error;
+    }
+    *read_out = data & 0xFF;
+    return 0;
 }
-uint16_t fmem_read16(int fd, uint32_t offset)
+int fmem_read16(int fd, uint32_t offset, uint16_t* read_out)
 {
-    return fmem_read(fd, offset, 2);
+    uint32_t data = 0;
+    int error = fmem_read(fd, offset, 1, &data);
+    if (error) {
+        return error;
+    }
+    *read_out = data & 0xFFFF;
+    return 0;
 }
-uint32_t fmem_read32(int fd, uint32_t offset)
+int fmem_read32(int fd, uint32_t offset, uint32_t* read_out)
 {
-    return fmem_read(fd, offset, 4);
+    return fmem_read(fd, offset, 4, read_out);
 }
-uint64_t fmem_read64(int fd, uint32_t offset)
+int fmem_read64(int fd, uint32_t offset, uint64_t* read_out)
 {
-    uint64_t hi = fmem_read32(fd, offset+4);
-    return (hi<<32) | fmem_read32(fd, offset);
+    uint32_t hi = 0;
+    uint32_t lo = 0;
+    int error = fmem_read32(fd, offset+4, &hi);
+    if (error) {
+        return error;
+    }
+    error = fmem_read32(fd, offset, &lo);
+    if (error) {
+        return error;
+    }
+
+    *read_out = ((uint64_t)hi << 32) | lo;
+
+    return 0;
 }
-uint64_t fmem_write(int fd, uint32_t offset, uint32_t data, uint8_t width)
+int fmem_write(int fd, uint32_t offset, uint32_t data, uint8_t width)
 {
     struct fmem_request req;
     int error;
@@ -102,22 +124,21 @@ uint64_t fmem_write(int fd, uint32_t offset, uint32_t data, uint8_t width)
     req.access_width = width;
 
     error = ioctl(fd, FMEM_WRITE, &req);
-    printf("write! offset: %x, req.data: %x, width: %x \r\n", offset, req.data, width);
     return (error);
 }
-uint64_t fmem_write8(int fd, uint32_t offset, uint8_t data)
+int fmem_write8(int fd, uint32_t offset, uint8_t data)
 {
     return fmem_write(fd, offset, data, 1);
 }
-uint64_t fmem_write16(int fd, uint32_t offset, uint16_t data)
+int fmem_write16(int fd, uint32_t offset, uint16_t data)
 {
     return fmem_write(fd, offset, data, 2);
 }
-uint64_t fmem_write32(int fd, uint32_t offset, uint32_t data)
+int fmem_write32(int fd, uint32_t offset, uint32_t data)
 {
     return fmem_write(fd, offset, data, 4);
 }
-uint64_t fmem_write64(int fd, uint32_t offset, uint64_t data)
+int fmem_write64(int fd, uint32_t offset, uint64_t data)
 {
     int error = fmem_write32(fd, offset, data);
     if (error) return error;
