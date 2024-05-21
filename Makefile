@@ -11,10 +11,8 @@ LINKFLAGS =
 
 all: $(OUTPT)
 
-$(OBJDIR):
+$(OUTPT): $(SRC)
 	mkdir -p $(OBJDIR)
-
-$(OUTPT): $(SRC) $(OBJDIR)
 	$(CC) -L $(OBJDIR) -I $(CURDIR) -o $@ $^ $(CFLAGS) $(LINKFLAGS)
 
 .PHONY: clean
