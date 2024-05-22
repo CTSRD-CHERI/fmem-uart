@@ -74,11 +74,11 @@ int main(int argc, const char **argv) {
     // Make sure we have 3 arguments
     assert(argc >= 1 && "argv must contain path to this program as first arg");
 
-    if (argc < 3) {
+    if (argc < 2) {
         print_help(argv[0]);
     }
 
-    if (strcmp("-h", argv[1]) || strcmp("--help", argv[1])) {
+    if (strcmp("-h", argv[1]) == 0 || strcmp("--help", argv[1]) == 0) {
         print_help(argv[0]);
     }
 
