@@ -105,9 +105,24 @@ int main(int argc, const char **argv) {
     // Read from the UART until the file disappears
     int error = 0;
     do {
-        uint8_t ascii = 0;
-        error = fmem_read8(fmem_dev, uart_offset, &ascii);
-        fprintf(stdout, "%c", ascii);
+        // Check the UART status
+        uint8_t line_status = 0;
+        error = fmem_read8(fmem_dev, uart_offset + 5, &line_status);
+        if (error) break;
+
+        // If it has data to send us, pull that data out and put it in stdout.
+        if (line_status & 0x01) {
+            uint8_t ascii = 0;
+            error = fmem_read8(fmem_dev, uart_offset, &ascii);
+            if (error) break;
+            
+            fprintf(stdout, "%c", ascii);
+        }
+
+        // If it has room for our data, pull data out of stdin and put it in.
+        if (line_status & 0x20) {
+            // TODO
+        }
     } while (error == 0);
 
     // Don't EXIT_FAILURE if fmem returns an error - that can just mean the file was closed while we're passively using it
