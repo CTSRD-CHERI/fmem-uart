@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
+#include <stdbool.h>
 
 // Safety/error detection
 #include <errno.h>
@@ -47,6 +48,8 @@
 
 // For accessing fmem file
 #include "fmem.h"
+
+#include <signal.h>
 
 // Print the help message for this program and exit
 void print_help(const char* argv0) {
@@ -68,6 +71,12 @@ void print_arg_error(const char* context, const char* argv0) {
         fprintf(stderr, "Error encountered while %s\n\n", context);
     }
     print_help(argv0);
+}
+
+// Catch control-c, close the file so that the fmem driver doesn't cry
+volatile sig_atomic_t should_stop = 0;
+void sigint_sigterm_handler(int signal) {
+    should_stop = 1;
 }
 
 int main(int argc, const char **argv) {
@@ -102,13 +111,29 @@ int main(int argc, const char **argv) {
         print_arg_error("opening fmem device", argv[0]);
     }
 
-    // Read from the UART until the file disappears
+    // Create the signal handler
+    struct sigaction sa = {};
+    sa.sa_handler=sigint_sigterm_handler;
+    sigemptyset(&sa.sa_mask);
+    /* sa.sa_flags =SA_RESTART */ /* Set this if blocking calls like read() or accept() should _not_ return on signal reception. */
+
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        print_arg_error("setting SIGINT handler", argv[0]);
+    }
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        print_arg_error("setting SIGTERM handler", argv[0]);
+    }
+
+    // Read from the UART until we get control-c
     int error = 0;
-    do {
+    while (!should_stop) {
         // Check the UART status
         uint8_t line_status = 0;
-        error = fmem_read8(fmem_dev, uart_offset + 5, &line_status);
+        error = fmem_read8(fmem_dev, uart_offset + (5 * 4), &line_status);
         if (error) break;
+
+        bool read=false;
+        bool wrote=false;
 
         // If it has data to send us, pull that data out and put it in stdout.
         if (line_status & 0x01) {
@@ -116,17 +141,26 @@ int main(int argc, const char **argv) {
             error = fmem_read8(fmem_dev, uart_offset, &ascii);
             if (error) break;
             
-            fprintf(stdout, "%c", ascii);
+            fprintf(stdout, "status 0x%x value %c (%d) (0x%x)\n", line_status, ascii, ascii, ascii);
+            read=true;
         }
 
         // If it has room for our data, pull data out of stdin and put it in.
         if (line_status & 0x20) {
             // TODO
         }
-    } while (error == 0);
 
-    // Don't EXIT_FAILURE if fmem returns an error - that can just mean the file was closed while we're passively using it
-    fprintf(stderr, "fmem-uart stopped because of fmem error %d\n", error);
+        if (!read && !wrote && !should_stop) {
+            sleep(1);
+        }
+    }
+
+    if (error) {
+        // Don't EXIT_FAILURE if fmem returns an error - that can just mean the file was closed while we're passively using it
+        fprintf(stderr, "fmem-uart stopped because of fmem error %d\n", error);
+    } else {
+        fprintf(stderr, "Exiting due to signal\n");
+    }
 
     // Close the fmem file
     close(fmem_dev);
