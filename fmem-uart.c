@@ -152,6 +152,7 @@ int main(int argc, const char **argv) {
 
         if (!read && !wrote && !should_stop) {
             sleep(1);
+            fflush(stdout);
         }
     }
 
