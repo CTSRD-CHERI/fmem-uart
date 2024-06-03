@@ -141,7 +141,8 @@ int main(int argc, const char **argv) {
             error = fmem_read8(fmem_dev, uart_offset, &ascii);
             if (error) break;
             
-            fprintf(stdout, "status 0x%x value %c (%d) (0x%x)\n", line_status, ascii, ascii, ascii);
+            fprintf(stdout, "%c", ascii);
+            // fprintf(stdout, "status 0x%x value %c (%d) (0x%x)\n", line_status, ascii, ascii, ascii);
             read=true;
         }
 
