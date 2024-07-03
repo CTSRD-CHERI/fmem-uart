@@ -51,6 +51,9 @@
 
 #include <signal.h>
 
+// For sleeping precisely
+#include <time.h>
+
 // Print the help message for this program and exit
 void print_help(const char* argv0) {
     fprintf(stderr, 
@@ -152,7 +155,11 @@ int main(int argc, const char **argv) {
         }
 
         if (!read && !wrote && !should_stop) {
-            sleep(1);
+            const struct timespec sleeptime = {
+                .tv_nsec = 10000000, // 10,000,000ns = 0.01s
+                .tv_sec = 0
+            };
+            nanosleep(&sleeptime, NULL);
             fflush(stdout);
         }
     }
